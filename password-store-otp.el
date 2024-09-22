@@ -46,8 +46,16 @@
 
 (defun password-store-otp--get-screenshot-executable ()
   "Return the name of the executable that should be used to take screenshots."
-  (if (and (eq system-type 'darwin)
-           (executable-find "screencapture")) "screencapture" "import"))
+  (cond
+   ((and (eq system-type 'darwin) (executable-find "screencapture")) "screencapture")
+   ((executable-find "spectacle") "spectacle")
+   (t "import")))
+
+(defun password-store-otp--get-screenshot-executable-args (screenshot-executable)
+  "Return the args needed for SCREENSHOT-EXECUTABLE to make it save to a given file."
+  (cond
+   ((equal screenshot-executable "spectacle") '("-n" "-b" "-w" "-o"))
+   (t nil)))
 
 (defun password-store-otp--otpauth-lines (lines)
   "Return from LINES those that are OTP urls."
@@ -171,7 +179,10 @@ primary \"pass otp\" command line verb."
   (interactive (list (password-store-otp-completing-read)))
   (let ((qr-image-filename (password-store-otp--get-qr-image-filename entry))
         (screenshot-executable (password-store-otp--get-screenshot-executable)))
-    (when (not (zerop (call-process screenshot-executable nil nil nil qr-image-filename)))
+    (when (not (zerop (apply #'call-process
+                             (append (list screenshot-executable nil nil nil)
+                                     (password-store-otp--get-screenshot-executable-args screenshot-executable)
+                                     (list qr-image-filename)))))
       (error "Couldn't get image from clipboard"))
     (with-temp-buffer
       (condition-case nil
